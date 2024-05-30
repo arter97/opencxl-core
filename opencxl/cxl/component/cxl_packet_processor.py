@@ -7,7 +7,7 @@
 
 from asyncio import StreamReader, StreamWriter, create_task, gather, Queue
 from dataclasses import dataclass
-from enum import StrEnum, IntEnum
+from enum import Enum, IntEnum
 from typing import cast, Optional, Dict
 
 from opencxl.util.logger import logger
@@ -38,7 +38,7 @@ class CXL_IO_FIFO_TYPE(IntEnum):
     MMIO = 1
 
 
-class PROCESSOR_DIRECTION(StrEnum):
+class PROCESSOR_DIRECTION(str, Enum):
     HOST_TO_TARGET = "host to target"
     TARGET_TO_HOST = "target to host"
 

@@ -15,7 +15,6 @@ from os.path import join, dirname, exists
 class MyLogger(logging.getLoggerClass()):
     def __init__(self):
         super().__init__(name="mylogger")
-        self._name_to_level = logging.getLevelNamesMapping()
         self._stdout_hdlr = logging.StreamHandler(sys.stdout)
 
         # reset root logger log level
@@ -57,7 +56,6 @@ class MyLogger(logging.getLoggerClass()):
         setattr(logging, level_name, level_num)
         setattr(logging.getLoggerClass(), method_name, log)
         setattr(logging, method_name, log)
-        self._name_to_level = logging.getLevelNamesMapping()
 
     def set_stdout_levels(
         self,
@@ -68,7 +66,7 @@ class MyLogger(logging.getLoggerClass()):
     ):
         formatter = self._get_formatter(show_timestamp, show_loglevel, show_linenumber)
         self.removeHandler(self._stdout_hdlr)
-        self._stdout_hdlr.setLevel(self._name_to_level[loglevel])
+        self._stdout_hdlr.setLevel(loglevel)
         self._stdout_hdlr.setFormatter(formatter)
         self.addHandler(self._stdout_hdlr)
 
@@ -88,7 +86,7 @@ class MyLogger(logging.getLoggerClass()):
 
         formatter = self._get_formatter(show_timestamp, show_loglevel, show_linenumber)
         file_handler = logging.FileHandler(filename)
-        file_handler.setLevel(self._name_to_level[loglevel])
+        file_handler.setLevel(loglevel)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
@@ -103,7 +101,7 @@ class MyLogger(logging.getLoggerClass()):
             data_ascii = "".join([chr(b) if (b > 32 and b < 128) else "." for b in d])
             data_bytes = " ".join(f"{i:02x}" for i in d)
             line = f"{addr:08x}:  {data_bytes:47}  |{data_ascii:16}|"
-            self._log(self._name_to_level[loglevel], line, args, **kwargs)
+            self._log(loglevel, line, args, **kwargs)
             addr += 0x10
 
 

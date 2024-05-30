@@ -34,15 +34,6 @@ def validate_component(ctx, param, components):
     return components
 
 
-def validate_log_level(ctx, param, level):
-    valid_levels = list(logging.getLevelNamesMapping().keys())
-    if level:
-        level = level.upper()
-        if not level in valid_levels:
-            raise click.BadParameter(f"Please select from {valid_levels}")
-    return level
-
-
 @cli.command(name="start")
 @click.pass_context
 @click.option(
@@ -56,7 +47,7 @@ def validate_log_level(ctx, param, level):
 @click.option("--config-file", help="<Config File> input path.")
 @click.option("--log-file", help="<Log File> output path.")
 @click.option("--pcap-file", help="<Packet Capture File> output path.")
-@click.option("--log-level", callback=validate_log_level, help="Specify log level.")
+@click.option("--log-level", help="Specify log level.")
 @click.option("--show-timestamp", is_flag=True, default=False, help="Show timestamp.")
 @click.option("--show-loglevel", is_flag=True, default=False, help="Show log level.")
 @click.option("--show-linenumber", is_flag=True, default=False, help="Show line number.")
