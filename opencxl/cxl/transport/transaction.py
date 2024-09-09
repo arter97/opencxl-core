@@ -375,7 +375,12 @@ class CxlIoMemReqPacket(CxlIoBasePacket):
 class CxlIoMemRdPacket(CxlIoMemReqPacket):
     @classmethod
     def create(
-        cls, addr: int, length: int, req_id: Optional[int] = None, tag: Optional[int] = None
+        cls,
+        addr: int,
+        length: int,
+        req_id: Optional[int] = None,
+        tag: Optional[int] = None,
+        ld_id: int = -1,
     ) -> "CxlIoMemRdPacket":
         if req_id is not None:
             req_id = htotlp16(req_id)
@@ -388,6 +393,7 @@ class CxlIoMemRdPacket(CxlIoMemReqPacket):
         packet = CxlIoMemRdPacket()
         packet.fill(addr, length, req_id, tag)
         packet.cxl_io_header.fmt_type = CXL_IO_FMT_TYPE.MRD_64B
+        packet.tlp_prefix.ld_id = ld_id
         packet.system_header.payload_length = CxlIoMemRdPacket.get_size()
         return packet
 
@@ -407,6 +413,7 @@ class CxlIoMemWrPacket(CxlIoMemReqPacket):
         data: int,
         req_id: Optional[int] = None,
         tag: Optional[int] = None,
+        ld_id: int = -1,
     ) -> "CxlIoMemWrPacket":
         if req_id is not None:
             req_id = htotlp16(req_id)
@@ -419,6 +426,7 @@ class CxlIoMemWrPacket(CxlIoMemReqPacket):
         packet = CxlIoMemWrPacket()
         packet.fill(addr, length, req_id, tag)
         packet.cxl_io_header.fmt_type = CXL_IO_FMT_TYPE.MWR_64B
+        packet.tlp_prefix.ld_id = ld_id
         packet.set_dynamic_field_length(length)
         packet.data = data
         packet.system_header.payload_length = len(packet)
@@ -577,6 +585,7 @@ class CxlIoCfgWrPacket(CxlIoCfgReqPacket):
         is_type0: bool = True,
         req_id: Optional[int] = None,
         tag: Optional[int] = None,
+        ld_id: int = -1,
     ) -> "CxlIoCfgWrPacket":
         if req_id is not None:
             req_id = htotlp16(req_id)
@@ -592,6 +601,7 @@ class CxlIoCfgWrPacket(CxlIoCfgReqPacket):
         packet.cxl_io_header.fmt_type = (
             CXL_IO_FMT_TYPE.CFG_WR0 if is_type0 else CXL_IO_FMT_TYPE.CFG_WR1
         )
+        packet.tlp_prefix.ld_id = ld_id
         packet = cast(CxlIoCfgWrPacket, packet)
         packet.value = value << (8 * offset)
         packet.system_header.payload_length = CxlIoCfgWrPacket.get_size()
@@ -1642,6 +1652,7 @@ class CxlMemMemRdPacket(CxlMemM2SReqPacket):
         meta_field: Optional[CXL_MEM_META_FIELD] = CXL_MEM_META_FIELD.NO_OP,
         meta_value: Optional[CXL_MEM_META_VALUE] = CXL_MEM_META_VALUE.ANY,
         snp_type: Optional[CXL_MEM_M2S_SNP_TYPE] = CXL_MEM_M2S_SNP_TYPE.NO_OP,
+        ld_id: int = -1,
     ) -> "CxlMemMemRdPacket":
         packet = CxlMemMemRdPacket()
         packet.system_header.payload_type = PAYLOAD_TYPE.CXL_MEM
@@ -1652,6 +1663,7 @@ class CxlMemMemRdPacket(CxlMemM2SReqPacket):
         packet.m2sreq_header.meta_field = meta_field
         packet.m2sreq_header.meta_value = meta_value
         packet.m2sreq_header.snp_type = snp_type
+        packet.m2sreq_header.ld_id = ld_id
         if addr % 0x40:
             raise Exception("Address must be a multiple of 0x40")
         packet.m2sreq_header.addr = addr >> 6
@@ -1667,6 +1679,7 @@ class CxlMemMemWrPacket(CxlMemM2SRwDPacket):
         meta_field: Optional[CXL_MEM_META_FIELD] = CXL_MEM_META_FIELD.NO_OP,
         meta_value: Optional[CXL_MEM_META_VALUE] = CXL_MEM_META_VALUE.ANY,
         snp_type: Optional[CXL_MEM_M2S_SNP_TYPE] = CXL_MEM_M2S_SNP_TYPE.NO_OP,
+        ld_id: int = -1,
     ) -> "CxlMemMemWrPacket":
         packet = CxlMemMemWrPacket()
         packet.system_header.payload_type = PAYLOAD_TYPE.CXL_MEM
@@ -1677,6 +1690,7 @@ class CxlMemMemWrPacket(CxlMemM2SRwDPacket):
         packet.m2srwd_header.meta_field = meta_field
         packet.m2srwd_header.meta_value = meta_value
         packet.m2srwd_header.snp_type = snp_type
+        packet.m2srwd_header.ld_id = ld_id
         if addr % 0x40:
             raise Exception("Address must be a multiple of 0x40")
         packet.m2srwd_header.addr = addr >> 6
