@@ -35,6 +35,7 @@ from opencxl.cxl.component.virtual_switch_manager import (
     VirtualSwitchConfig,
 )
 from opencxl.apps.accelerator import MyType1Accelerator, MyType2Accelerator
+from opencxl.cxl.device.config.logical_device import SingleLogicalDeviceConfig
 from opencxl.drivers.cxl_mem_driver import CxlMemDriver
 from opencxl.util.component import RunnableComponent
 from opencxl.util.number_const import MB
@@ -80,8 +81,9 @@ BASE_TEST_PORT = 19300
 #         )
 
 #     sw_conn_manager = SwitchConnectionManager(port_configs, port=switch_port)
+#     device_config = [SingleLogicalDeviceConfig("0",0,0,"0"),SingleLogicalDeviceConfig("0",0,0,"0")]
 #     physical_port_manager = PhysicalPortManager(
-#         switch_connection_manager=sw_conn_manager, port_configs=port_configs
+#         switch_connection_manager=sw_conn_manager, port_configs=port_configs, sld_configs=device_config
 #     )
 
 #     switch_configs = [
@@ -226,8 +228,14 @@ async def test_cxl_host_type1_complex_host_ete():
         )
 
     sw_conn_manager = SwitchConnectionManager(port_configs, port=switch_port)
+    device_config = [
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+    ]
     physical_port_manager = PhysicalPortManager(
-        switch_connection_manager=sw_conn_manager, port_configs=port_configs
+        switch_connection_manager=sw_conn_manager,
+        port_configs=port_configs,
+        sld_configs=device_config,
     )
 
     switch_configs = [

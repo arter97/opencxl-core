@@ -16,7 +16,7 @@ from opencxl.cxl.component.physical_port_manager import (
     DownstreamPortDevice,
 )
 from opencxl.cxl.component.switch_connection_manager import SwitchConnectionManager
-
+from opencxl.cxl.device.config.logical_device import SingleLogicalDeviceConfig
 
 BASE_TEST_PORT = 9000
 
@@ -32,18 +32,26 @@ def test_physical_port_manager_init(get_gold_std_reg_vals):
     ]
     port = BASE_TEST_PORT + pytest.PORT.TEST_1
     switch_connection_manager = SwitchConnectionManager(port_configs, port=port)
+    device_config = [
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+    ]
     physical_port_manager = PhysicalPortManager(
-        switch_connection_manager=switch_connection_manager, port_configs=port_configs
+        switch_connection_manager=switch_connection_manager,
+        port_configs=port_configs,
+        sld_configs=device_config,
     )
     for port_index, port_config in enumerate(port_configs):
         port_device = physical_port_manager.get_port_device(port_index)
-        reg_vals = str(port_device.get_reg_vals())
         if port_config.type == PORT_TYPE.USP:
             assert isinstance(port_device, UpstreamPortDevice)
+            reg_vals = str(port_device.get_reg_vals())
             reg_vals_expected = get_gold_std_reg_vals("USP")
             assert reg_vals == reg_vals_expected
         else:
             assert isinstance(port_device, DownstreamPortDevice)
+            port_device.register_vppb(port_index)
+            reg_vals = str(port_device.get_reg_vals(port_index))
             reg_vals_expected = get_gold_std_reg_vals("DSP")
             assert reg_vals == reg_vals_expected
 
@@ -63,8 +71,14 @@ async def test_physical_port_manager_run_and_stop():
     ]
     port = BASE_TEST_PORT + pytest.PORT.TEST_2
     switch_connection_manager = SwitchConnectionManager(port_configs, port=port)
+    device_config = [
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+    ]
     physical_port_manager = PhysicalPortManager(
-        switch_connection_manager=switch_connection_manager, port_configs=port_configs
+        switch_connection_manager=switch_connection_manager,
+        port_configs=port_configs,
+        sld_configs=device_config,
     )
 
     async def wait_and_stop():
@@ -86,8 +100,14 @@ async def test_physical_port_manager_stop_before_run():
     ]
     port = BASE_TEST_PORT + pytest.PORT.TEST_3
     switch_connection_manager = SwitchConnectionManager(port_configs, port=port)
+    device_config = [
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+    ]
     physical_port_manager = PhysicalPortManager(
-        switch_connection_manager=switch_connection_manager, port_configs=port_configs
+        switch_connection_manager=switch_connection_manager,
+        port_configs=port_configs,
+        sld_configs=device_config,
     )
 
     with pytest.raises(Exception, match="Cannot stop when it is not running"):
@@ -105,8 +125,14 @@ async def test_physical_port_manager_run_after_run():
     ]
     port = BASE_TEST_PORT + pytest.PORT.TEST_4
     switch_connection_manager = SwitchConnectionManager(port_configs, port=port)
+    device_config = [
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+    ]
     physical_port_manager = PhysicalPortManager(
-        switch_connection_manager=switch_connection_manager, port_configs=port_configs
+        switch_connection_manager=switch_connection_manager,
+        port_configs=port_configs,
+        sld_configs=device_config,
     )
 
     async def wait_and_run():

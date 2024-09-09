@@ -51,6 +51,7 @@ from opencxl.cxl.cci.vendor_specfic import (
 )
 from opencxl.util.component import RunnableComponent
 from opencxl.cxl.device.config.logical_device import SingleLogicalDeviceConfig
+from opencxl.cxl.device.config.logical_device import MultiLogicalDeviceConfig
 
 
 @dataclass
@@ -71,7 +72,8 @@ class CxlSwitch(RunnableComponent):
     def __init__(
         self,
         switch_config: CxlSwitchConfig,
-        device_configs: List[SingleLogicalDeviceConfig],
+        sld_configs: List[SingleLogicalDeviceConfig] = None,
+        mld_configs: List[MultiLogicalDeviceConfig] = None,
         start_mctp: bool = True,
     ):
         super().__init__()
@@ -79,7 +81,7 @@ class CxlSwitch(RunnableComponent):
             switch_config.port_configs, switch_config.host, switch_config.port
         )
         self._physical_port_manager = PhysicalPortManager(
-            self._switch_connection_manager, switch_config.port_configs, device_configs
+            self._switch_connection_manager, switch_config.port_configs, sld_configs, mld_configs
         )
         self._virtual_switch_manager = VirtualSwitchManager(
             switch_config.virtual_switch_configs, self._physical_port_manager

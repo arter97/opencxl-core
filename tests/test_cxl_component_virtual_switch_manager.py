@@ -22,6 +22,7 @@ from opencxl.cxl.component.virtual_switch_manager import (
     CxlVirtualSwitch,
 )
 from opencxl.util.unaligned_bit_structure import UnalignedBitStructure
+from opencxl.cxl.device.config.logical_device import SingleLogicalDeviceConfig
 
 BASE_TEST_PORT = 9200
 
@@ -36,8 +37,15 @@ def test_virtual_switch_manager_init():
     ]
     port = BASE_TEST_PORT + pytest.PORT.TEST_1
     switch_connection_manager = SwitchConnectionManager(port_configs, port=port)
+    device_config = [
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+    ]
     physical_port_manager = PhysicalPortManager(
-        switch_connection_manager=switch_connection_manager, port_configs=port_configs
+        switch_connection_manager=switch_connection_manager,
+        port_configs=port_configs,
+        sld_configs=device_config,
     )
     switch_configs = [
         VirtualSwitchConfig(upstream_port_index=0, vppb_counts=3, initial_bounds=[1, 2, 3])
@@ -64,8 +72,15 @@ async def test_virtual_switch_manager_run_and_stop():
     ]
     port = BASE_TEST_PORT + pytest.PORT.TEST_2
     switch_connection_manager = SwitchConnectionManager(port_configs, port=port)
+    device_config = [
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+        SingleLogicalDeviceConfig("0", 0, 0, "0"),
+    ]
     physical_port_manager = PhysicalPortManager(
-        switch_connection_manager=switch_connection_manager, port_configs=port_configs
+        switch_connection_manager=switch_connection_manager,
+        port_configs=port_configs,
+        sld_configs=device_config,
     )
     switch_configs = [
         VirtualSwitchConfig(upstream_port_index=0, vppb_counts=3, initial_bounds=[1, 2, 3])
