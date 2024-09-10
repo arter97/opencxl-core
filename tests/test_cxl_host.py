@@ -58,7 +58,7 @@ class SimpleJsonClient:
                 return
             except OSError as _:
                 await asyncio.sleep(0.2)
-
+    # pylint: disable=duplicate-code
     async def close(self):
         await self._ws.close()
 
@@ -383,7 +383,8 @@ async def test_cxl_host_type3_ete():
 #     sw_conn_manager = SwitchConnectionManager(port_configs, port=switch_port)
 #     device_config = [SingleLogicalDeviceConfig("0",0,0,"0")]
 #     physical_port_manager = PhysicalPortManager(
-#         switch_connection_manager=sw_conn_manager, port_configs=port_configs, sld_configs=device_config
+#         switch_connection_manager=sw_conn_manager, port_configs=port_configs,
+#         sld_configs=device_config
 #     )
 
 #     switch_configs = [

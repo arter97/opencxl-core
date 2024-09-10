@@ -250,6 +250,7 @@ class DownstreamPortDevice(CxlPortDevice):
         wait_tasks = [
             create_task(self._cxl_io_manager[i].wait_for_ready()) for i in range(self._num_vppb)
         ] + [create_task(self._cxl_mem_manager[i].wait_for_ready()) for i in range(self._num_vppb)]
+        # pylint: disable=duplicate-code
         await gather(*wait_tasks)
         await self._change_status_to_running()
         await gather(*run_tasks)

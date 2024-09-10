@@ -4,6 +4,7 @@
  This software is licensed under the terms of the Revised BSD License.
  See LICENSE for details.
 """
+# pylint: disable=duplicate-code
 
 from asyncio import gather, create_task
 import pytest
@@ -52,6 +53,7 @@ async def test_single_logical_device_run_stop(get_gold_std_reg_vals):
 
 
 @pytest.mark.asyncio
+# pylint: disable=duplicate-code
 async def test_single_logical_device_enumeration():
     memory_size = 256 * MB
     memory_file = "mem.bin"
@@ -72,3 +74,4 @@ async def test_single_logical_device_enumeration():
 
     tasks = [create_task(device.run()), create_task(wait_and_stop())]
     await gather(*tasks)
+    

@@ -8,13 +8,12 @@
 from asyncio import gather, create_task
 import asyncio
 import struct
-from typing import cast, Optional, Dict, Union, List
+from typing import cast
 import pytest
 
 from opencxl.apps.multi_logical_device import MultiLogicalDevice
 from opencxl.cxl.component.common import CXL_COMPONENT_TYPE
 from opencxl.cxl.component.cxl_packet_processor import CxlPacketProcessor
-from opencxl.cxl.component.hdm_decoder import DecoderInfo
 from opencxl.cxl.component.packet_reader import PacketReader
 from opencxl.cxl.device.cxl_type3_device import CxlType3Device, CXL_T3_DEV_TYPE
 from opencxl.cxl.device.root_port_device import CxlRootPortDevice
@@ -25,24 +24,11 @@ from opencxl.util.pci import create_bdf
 from opencxl.cxl.transport.transaction import (
     CxlIoMemRdPacket,
     CxlIoMemWrPacket,
-    CxlIoCompletionWithDataPacket,
-    is_cxl_io_completion_status_sc,
-)
-from opencxl.cxl.transport.transaction import (
-    CxlIoCfgRdPacket,
     CxlIoCfgWrPacket,
-    CxlIoMemRdPacket,
-    CxlIoMemWrPacket,
-    CxlIoCompletionWithDataPacket,
     CxlMemMemRdPacket,
     CxlMemMemWrPacket,
-    CxlMemMemDataPacket,
-    CxlMemBIRspPacket,
-    CxlMemBISnpPacket,
-    CxlMemCmpPacket,
-    CXL_IO_CPL_STATUS,
-    CXL_MEM_M2SBIRSP_OPCODE,
-    CXL_MEM_S2MBISNP_OPCODE,
+    CxlIoCompletionWithDataPacket,
+    is_cxl_io_completion_status_sc,
 )
 
 
@@ -59,7 +45,7 @@ def test_multi_logical_device():
 
 
 @pytest.mark.asyncio
-async def test_multi_logical_device_run_stop(get_gold_std_reg_vals):
+async def test_multi_logical_device_run_stop():
     memory_size = 256 * MB
     memory_file = "mem.bin"
     transport_connection = CxlConnection()
@@ -75,7 +61,7 @@ async def test_multi_logical_device_run_stop(get_gold_std_reg_vals):
     # reg_vals = str(device.get_reg_vals())
     # reg_vals_expected = get_gold_std_reg_vals("SLD")
     # assert reg_vals == reg_vals_expected
-
+    # pylint: disable=duplicate-code
     async def wait_and_stop():
         await device.wait_for_ready()
         await device.stop()
@@ -85,6 +71,7 @@ async def test_multi_logical_device_run_stop(get_gold_std_reg_vals):
 
 
 @pytest.mark.asyncio
+# pylint: disable=duplicate-code
 async def test_multi_logical_device_enumeration():
     memory_size = 256 * MB
     memory_file = "mem.bin"
@@ -114,9 +101,7 @@ async def test_multi_logical_device_ld_id():
     num_ld = 4
     # Test routing to LD-ID 2
     target_ld_id = 2
-
     ld_size = 256 * MB
-
     logger.info(f"[PyTest] Creating {num_ld} LDs, testing LD-ID routing to {target_ld_id}")
 
     # Create MLD instance
@@ -132,7 +117,7 @@ async def test_multi_logical_device_ld_id():
 
     # Start MLD pseudo server
     async def handle_client(reader, writer):
-        global mld_pseudo_server_reader, mld_pseudo_server_packet_reader, mld_pseudo_server_writer
+        global mld_pseudo_server_reader, mld_pseudo_server_packet_reader, mld_pseudo_server_writer # pylint: disable=global-variable-undefined
         mld_pseudo_server_reader = reader
         mld_pseudo_server_packet_reader = PacketReader(reader, label="test_mmio")
         mld_pseudo_server_writer = writer
@@ -153,7 +138,7 @@ async def test_multi_logical_device_ld_id():
         mld_packet_processor_writer,
         cxl_connections,
         CXL_COMPONENT_TYPE.LD,
-        label=f"ClientPortMld",
+        label="ClientPortMld",
     )
     mld_packet_processor_task = create_task(mld_packet_processor.run())
 
@@ -370,7 +355,7 @@ async def test_multi_logical_device_ld_id():
             assert value == target_data
 
     async def wait_test_stop():
-        await gather(*(device.wait_for_ready() for device in mld._cxl_type3_devices))
+        await gather(*(device.wait_for_ready() for device in mld._cxl_type3_devices)) # pylint: disable=protected-access
         # Test MLD LD-ID handling
         await setup_hdm_decoder(num_ld, mld_pseudo_server_reader, mld_pseudo_server_writer)
         await configure_bar(target_ld_id, mld_pseudo_server_reader, mld_pseudo_server_writer)
@@ -379,11 +364,11 @@ async def test_multi_logical_device_ld_id():
         # Stop all devices
         await mld_packet_processor.stop()
         await mld_packet_processor_task
-        await mld._stop()
+        await mld._stop() # pylint: disable=protected-access
 
     test_task = create_task(wait_test_stop())
     # Start MLD
-    await mld._run()
+    await mld._run() # pylint: disable=protected-access
 
     await test_task
 

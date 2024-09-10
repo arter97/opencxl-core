@@ -81,9 +81,11 @@ BASE_TEST_PORT = 19300
 #         )
 
 #     sw_conn_manager = SwitchConnectionManager(port_configs, port=switch_port)
-#     device_config = [SingleLogicalDeviceConfig("0",0,0,"0"),SingleLogicalDeviceConfig("0",0,0,"0")]
+#     device_config = [SingleLogicalDeviceConfig("0",0,0,"0"),
+#     SingleLogicalDeviceConfig("0",0,0,"0")]
 #     physical_port_manager = PhysicalPortManager(
-#         switch_connection_manager=sw_conn_manager, port_configs=port_configs, sld_configs=device_config
+#         switch_connection_manager=sw_conn_manager, port_configs=port_configs,
+#         sld_configs=device_config
 #     )
 
 #     switch_configs = [

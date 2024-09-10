@@ -65,6 +65,7 @@ class ConfigSpaceManager(RunnableComponent):
     async def _send_unsupported_request(self, req_id, tag):
         packet = CxlIoCompletionPacket.create(req_id, tag, status=CXL_IO_CPL_STATUS.UR)
         # Add MLD
+        # pylint: disable=duplicate-code
         if self._ld_id is not None:
             packet.tlp_prefix.ld_id = self._ld_id
         else:
