@@ -162,6 +162,9 @@ class MmioRouter(CxlRouter):
             if target_port >= len(self._downstream_connections):
                 raise Exception("target_port is out of bound")
 
+            # MLD
+            cxl_io_base_packet.tlp_prefix.ld_id = target_port
+
             downstream_connection_fifo = self._downstream_connections[
                 target_port
             ].vppb_connection.mmio_fifo
@@ -239,6 +242,9 @@ class ConfigSpaceRouter(CxlRouter):
                 await self._send_unsupported_request(req_id, tag)
                 continue
 
+            # MLD
+            cxl_io_packet.tlp_prefix.ld_id = target_port
+
             logger.debug(self._create_message(f"Target port is {target_port}"))
 
             downstream_connection_fifo = self._downstream_connections[
@@ -298,10 +304,14 @@ class CxlMemRouter(CxlRouter):
                 cxl_mem_packet = cast(CxlMemM2SReqPacket, packet)
                 addr = cxl_mem_packet.get_address()
                 target_port = self._routing_table.get_cxl_mem_target_port(addr)
+                # MLD
+                cxl_mem_packet.m2sreq_header.ld_id = target_port
             elif cxl_mem_base_packet.is_m2srwd():
                 cxl_mem_packet = cast(CxlMemM2SRwDPacket, packet)
                 addr = cxl_mem_packet.get_address()
                 target_port = self._routing_table.get_cxl_mem_target_port(addr)
+                # MLD
+                cxl_mem_packet.m2srwd_header.ld_id = target_port
             elif cxl_mem_base_packet.is_m2sbirsp():
                 cxl_mem_bi_packet: CxlMemM2SBIRspPacket = cast(
                     CxlMemM2SBIRspPacket, cxl_mem_base_packet

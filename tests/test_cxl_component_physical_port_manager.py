@@ -37,13 +37,15 @@ def test_physical_port_manager_init(get_gold_std_reg_vals):
     )
     for port_index, port_config in enumerate(port_configs):
         port_device = physical_port_manager.get_port_device(port_index)
-        reg_vals = str(port_device.get_reg_vals())
         if port_config.type == PORT_TYPE.USP:
             assert isinstance(port_device, UpstreamPortDevice)
+            reg_vals = str(port_device.get_reg_vals())
             reg_vals_expected = get_gold_std_reg_vals("USP")
             assert reg_vals == reg_vals_expected
         else:
             assert isinstance(port_device, DownstreamPortDevice)
+            port_device.register_vppb(port_index)
+            reg_vals = str(port_device.get_reg_vals(port_index))
             reg_vals_expected = get_gold_std_reg_vals("DSP")
             assert reg_vals == reg_vals_expected
 

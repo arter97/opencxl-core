@@ -6,7 +6,10 @@
 """
 
 from dataclasses import dataclass
+from asyncio import create_task, gather
 from typing import Optional
+
+from opencxl.util.logger import logger
 
 from opencxl.cxl.component.common import CXL_COMPONENT_TYPE
 from opencxl.cxl.component.cxl_cache_manager import CxlCacheManager
@@ -67,6 +70,7 @@ class DownstreamPortDevice(CxlPortDevice):
         transport_connection: CxlConnection,
         port_index: int = 0,
         dummy_config: Optional[DummyConfig] = None,
+        num_vppb: int = 1,
     ):
         if dummy_config is not None:
             self._vcs_id = dummy_config.vcs_id
@@ -78,27 +82,39 @@ class DownstreamPortDevice(CxlPortDevice):
 
         self._dummy_config = dummy_config
         self._is_dummy = dummy_config is not None
-        self._pci_bridge_component = None
-        self._pci_registers = None
+        self._num_vppb = num_vppb
         self._cxl_component = None
-        self._upstream_connection = CxlConnection()
 
-        self._cxl_io_manager = CxlIoManager(
-            self._upstream_connection.mmio_fifo,
-            self._transport_connection.mmio_fifo,
-            self._upstream_connection.cfg_fifo,
-            self._transport_connection.cfg_fifo,
-            device_type=PCI_DEVICE_TYPE.DOWNSTREAM_BRIDGE,
-            init_callback=self._init_device,
-            label=self._get_label(),
-        )
-        self._cxl_mem_manager = CxlMemManager(
-            upstream_fifo=self._upstream_connection.cxl_mem_fifo,
-            downstream_fifo=transport_connection.cxl_mem_fifo,
-            label=self._get_label(),
-        )
+        self._pci_bridge_component = []
+        self._pci_registers = []
+        self._upstream_connection = [CxlConnection() for _ in range(num_vppb)]
+
+        self._cxl_io_manager = [
+            CxlIoManager(
+                self._upstream_connection[i].mmio_fifo,
+                self._transport_connection.mmio_fifo,
+                self._upstream_connection[i].cfg_fifo,
+                self._transport_connection.cfg_fifo,
+                device_type=PCI_DEVICE_TYPE.DOWNSTREAM_BRIDGE,
+                init_callback=self._init_device,
+                label=self._get_label(),
+            )
+            for i in range(num_vppb)
+        ]
+        self._cxl_mem_manager = [
+            CxlMemManager(
+                upstream_fifo=self._upstream_connection[i].cxl_mem_fifo,
+                downstream_fifo=transport_connection.cxl_mem_fifo,
+                label=self._get_label(),
+            )
+            for i in range(num_vppb)
+        ]
+        self._vppb_bind_table = {}
+        self._available_pcie = list(range(num_vppb))
+        if self._is_dummy:
+            self.register_vppb(self._vppb_index)
         self._cxl_cache_manager = CxlCacheManager(
-            upstream_fifo=self._upstream_connection.cxl_cache_fifo,
+            upstream_fifo=self._upstream_connection[0].cxl_cache_fifo,
             downstream_fifo=transport_connection.cxl_cache_fifo,
             label=self._get_label(),
         )
@@ -116,15 +132,17 @@ class DownstreamPortDevice(CxlPortDevice):
             programming_interface=0x00,
             device_port_type=PCI_DEVICE_PORT_TYPE.DOWNSTREAM_PORT_OF_PCI_EXPRESS_SWITCH,
         )
-        self._pci_bridge_component = PciBridgeComponent(
-            identity=pci_identity,
-            type=PCI_BRIDGE_TYPE.DOWNSTREAM_PORT,
-            mmio_manager=mmio_manager,
-            label=self._get_label(),
+        self._pci_bridge_component.append(
+            PciBridgeComponent(
+                identity=pci_identity,
+                type=PCI_BRIDGE_TYPE.DOWNSTREAM_PORT,
+                mmio_manager=mmio_manager,
+                label=self._get_label(),
+            )
         )
         if self._is_dummy:
-            self._pci_bridge_component.set_port_number(self._dummy_config.vppb_id)
-            self._pci_bridge_component.set_routing_table(self._dummy_config.routing_table)
+            self._pci_bridge_component[0].set_port_number(self._dummy_config.vppb_id)
+            self._pci_bridge_component[0].set_routing_table(self._dummy_config.routing_table)
 
         # Create MMIO register
         cxl_component = CxlDownstreamPortComponent()
@@ -135,7 +153,7 @@ class DownstreamPortDevice(CxlPortDevice):
 
         # Create Config Space Register
         pci_registers_options = CxlDownstreamPortConfigSpaceOptions(
-            pci_bridge_component=self._pci_bridge_component,
+            pci_bridge_component=self._pci_bridge_component[-1],
             dvsec=DvsecConfigSpaceOptions(
                 device_type=CXL_DEVICE_TYPE.DSP,
                 register_locator=DvsecRegisterLocatorOptions(
@@ -143,8 +161,8 @@ class DownstreamPortDevice(CxlPortDevice):
                 ),
             ),
         )
-        self._pci_registers = CxlDownstreamPortConfigSpace(options=pci_registers_options)
-        config_space_manager.set_register(self._pci_registers)
+        self._pci_registers.append(CxlDownstreamPortConfigSpace(options=pci_registers_options))
+        config_space_manager.set_register(self._pci_registers[-1])
 
     def _get_label(self) -> str:
         if self._is_dummy:
@@ -157,55 +175,65 @@ class DownstreamPortDevice(CxlPortDevice):
         message = f"[{self.__class__.__name__}:{self._get_label()}] {message}"
         return message
 
-    def get_reg_vals(self):
-        return self._cxl_io_manager.get_cfg_reg_vals()
+    def register_vppb(self, vppb_index: int):
+        self._vppb_bind_table[vppb_index] = self._available_pcie.pop(0)
 
-    def get_upstream_connection(self) -> CxlConnection:
-        return self._upstream_connection
+    def unregister_vppb(self, vppb_index: int):
+        self._available_pcie.append(self._vppb_bind_table.pop(vppb_index))
+
+    def get_reg_vals(self, vppb_index: int):
+        return self._cxl_io_manager[self._vppb_bind_table[vppb_index]].get_cfg_reg_vals()
+
+    def get_upstream_connection(self, vppb_index: int) -> CxlConnection:
+        return self._upstream_connection[self._vppb_bind_table[vppb_index]]
 
     def set_vppb_index(self, vppb_index: int):
         if self._is_dummy:
             raise Exception("Dummy Downstream Port does not support updating the vPPB index")
-        self._vppb_index = vppb_index
-        self._pci_bridge_component.set_port_number(self._vppb_index)
+        self._pci_bridge_component[self._vppb_bind_table[vppb_index]].set_port_number(vppb_index)
 
     def get_device_type(self) -> CXL_COMPONENT_TYPE:
         return CXL_COMPONENT_TYPE.DSP
 
-    def set_routing_table(self, routing_table: RoutingTable):
+    def set_routing_table(
+        self, routing_table: RoutingTable, vppb_index: int
+    ):  # pylint: disable=arguments-differ
         if self._is_dummy:
             raise Exception("Dummy Downstream Port does not support updating the routing table")
-        self._pci_bridge_component.set_routing_table(routing_table)
+        self._pci_bridge_component[self._vppb_bind_table[vppb_index]].set_routing_table(
+            routing_table
+        )
 
-    def backup_enumeration_info(self) -> EnumerationInfo:
+    def backup_enumeration_info(self, vppb_index: int) -> EnumerationInfo:
+        pci_register = self._pci_registers[self._vppb_bind_table[vppb_index]].pci
         info = EnumerationInfo(
-            secondary_bus=self._pci_registers.pci.secondary_bus_number,
-            subordinate_bus=self._pci_registers.pci.subordinate_bus_number,
-            memory_base=self._pci_registers.pci.memory_base,
-            memory_limit=self._pci_registers.pci.memory_limit,
+            secondary_bus=pci_register.secondary_bus_number,
+            subordinate_bus=pci_register.subordinate_bus_number,
+            memory_base=pci_register.memory_base,
+            memory_limit=pci_register.memory_limit,
         )
         return info
 
     def get_secondary_bus_number(self):
-        return self._pci_registers.pci.secondary_bus_number
+        return self._pci_registers[0].pci.secondary_bus_number
 
-    def restore_enumeration_info(self, info: EnumerationInfo):
-        self._pci_registers.write_bytes(
+    def restore_enumeration_info(self, info: EnumerationInfo, vppb_index: int):
+        self._pci_registers[self._vppb_bind_table[vppb_index]].write_bytes(
             REG_ADDR.SECONDARY_BUS_NUMBER.START,
             REG_ADDR.SECONDARY_BUS_NUMBER.END,
             info.secondary_bus,
         )
-        self._pci_registers.write_bytes(
+        self._pci_registers[self._vppb_bind_table[vppb_index]].write_bytes(
             REG_ADDR.SUBORDINATE_BUS_NUMBER.START,
             REG_ADDR.SUBORDINATE_BUS_NUMBER.END,
             info.subordinate_bus,
         )
-        self._pci_registers.write_bytes(
+        self._pci_registers[self._vppb_bind_table[vppb_index]].write_bytes(
             REG_ADDR.MEMORY_BASE.START,
             REG_ADDR.MEMORY_BASE.END,
             info.memory_base,
         )
-        self._pci_registers.write_bytes(
+        self._pci_registers[self._vppb_bind_table[vppb_index]].write_bytes(
             REG_ADDR.MEMORY_LIMIT.START,
             REG_ADDR.MEMORY_LIMIT.END,
             info.memory_limit,
@@ -213,3 +241,33 @@ class DownstreamPortDevice(CxlPortDevice):
 
     def get_cxl_component(self) -> CxlDownstreamPortComponent:
         return self._cxl_component
+
+    async def _run(self):
+        logger.info(self._create_message("Starting"))
+        run_tasks = (
+            [create_task(self._cxl_io_manager[i].run()) for i in range(self._num_vppb)]
+            + [create_task(self._cxl_mem_manager[i].run()) for i in range(self._num_vppb)]
+            + [create_task(self._cxl_cache_manager.run()) for i in range(self._num_vppb)]
+        )
+        wait_tasks = (
+            [create_task(self._cxl_io_manager[i].wait_for_ready()) for i in range(self._num_vppb)]
+            + [
+                create_task(self._cxl_mem_manager[i].wait_for_ready())
+                for i in range(self._num_vppb)
+            ]
+            + [create_task(self._cxl_cache_manager.wait_for_ready()) for i in range(self._num_vppb)]
+        )
+        # pylint: disable=duplicate-code
+        await gather(*wait_tasks)
+        await self._change_status_to_running()
+        await gather(*run_tasks)
+        logger.info(self._create_message("Stopped"))
+
+    async def _stop(self):
+        logger.info(self._create_message("Stopping"))
+        tasks = (
+            [create_task(self._cxl_io_manager[i].stop()) for i in range(self._num_vppb)]
+            + [create_task(self._cxl_mem_manager[i].stop()) for i in range(self._num_vppb)]
+            + [create_task(self._cxl_cache_manager.stop()) for i in range(self._num_vppb)]
+        )
+        await gather(*tasks)
