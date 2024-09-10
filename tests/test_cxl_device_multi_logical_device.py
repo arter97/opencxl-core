@@ -130,13 +130,6 @@ async def test_multi_logical_device_ld_id():
         cxl_connections=cxl_connections,
     )
 
-    # Setup HDM decoder
-    for device in mld._cxl_type3_devices:
-        # Use HPA = DPA
-        device._cxl_memory_device_component._hdm_decoder_manager.commit(
-            0, DecoderInfo(size=ld_size, base=0x0)
-        )
-
     # Start MLD pseudo server
     async def handle_client(reader, writer):
         global mld_pseudo_server_reader, mld_pseudo_server_packet_reader, mld_pseudo_server_writer
@@ -188,6 +181,103 @@ async def test_multi_logical_device_ld_id():
         # ACK
         packet = await packet_reader.get_packet()
         assert is_cxl_io_completion_status_sc(packet)
+
+    async def setup_hdm_decoder(
+        num_ld: int, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ):
+        packet_reader = PacketReader(reader, label="setup_hdm_decoder")
+        packet_writer = writer
+
+        register_offset = memory_base_address + 0x1014
+        decoder_index = 0
+        hpa_base = 0x0
+        hpa_size = ld_size
+        dpa_skip = 0
+        interleaving_granularity = 0
+        interleaving_way = 0
+
+        for ld_id in range(num_ld):
+            # NOTE: Test Config Space Type0 Write - BAR WRITE
+            packet = CxlIoCfgWrPacket.create(
+                create_bdf(0, 0, 0),
+                0x10,
+                4,
+                value=register_offset,
+                is_type0=True,
+                ld_id=ld_id,
+            )
+            packet_writer.write(bytes(packet))
+            await packet_writer.drain()
+            # ACK
+            packet = await packet_reader.get_packet()
+            assert is_cxl_io_completion_status_sc(packet)
+
+            # Use HPA = DPA
+            logger.info(f"[PyTest] Setting up HDM Decoder for {ld_id}")
+
+            dpa_skip_low_offset = 0x20 * decoder_index + 0x24 + register_offset
+            dpa_skip_high_offset = 0x20 * decoder_index + 0x28 + register_offset
+            dpa_skip_low = dpa_skip & 0xFFFFFFFF
+            dpa_skip_high = (dpa_skip >> 32) & 0xFFFFFFFF
+
+            packet = CxlIoMemWrPacket.create(dpa_skip_low_offset, 4, dpa_skip_low, ld_id=ld_id)
+            writer.write(bytes(packet))
+            await writer.drain()
+
+            packet = CxlIoMemWrPacket.create(dpa_skip_high_offset, 4, dpa_skip_high, ld_id=ld_id)
+            writer.write(bytes(packet))
+            await writer.drain()
+
+            decoder_base_low_offset = 0x20 * decoder_index + 0x10 + register_offset
+            decoder_base_high_offset = 0x20 * decoder_index + 0x14 + register_offset
+            decoder_size_low_offset = 0x20 * decoder_index + 0x18 + register_offset
+            decoder_size_high_offset = 0x20 * decoder_index + 0x1C + register_offset
+            decoder_control_register_offset = 0x20 * decoder_index + 0x20 + register_offset
+
+            commit = 1
+
+            decoder_base_low = hpa_base & 0xFFFFFFFF
+            decoder_base_high = (hpa_base >> 32) & 0xFFFFFFFF
+            decoder_size_low = hpa_size & 0xFFFFFFFF
+            decoder_size_high = (hpa_size >> 32) & 0xFFFFFFFF
+
+            decoder_control = (
+                interleaving_granularity & 0xF | (interleaving_way & 0xF) << 4 | commit << 9
+            )
+
+            packet = CxlIoMemWrPacket.create(
+                decoder_base_low_offset, 4, decoder_base_low, ld_id=ld_id
+            )
+            writer.write(bytes(packet))
+            await writer.drain()
+
+            packet = CxlIoMemWrPacket.create(
+                decoder_base_high_offset, 4, decoder_base_high, ld_id=ld_id
+            )
+            writer.write(bytes(packet))
+            await writer.drain()
+
+            packet = CxlIoMemWrPacket.create(
+                decoder_size_low_offset, 4, decoder_size_low, ld_id=ld_id
+            )
+            writer.write(bytes(packet))
+            await writer.drain()
+
+            packet = CxlIoMemWrPacket.create(
+                decoder_size_high_offset, 4, decoder_size_high, ld_id=ld_id
+            )
+            writer.write(bytes(packet))
+            await writer.drain()
+
+            packet = CxlIoMemWrPacket.create(
+                decoder_control_register_offset, 4, decoder_control, ld_id=ld_id
+            )
+            writer.write(bytes(packet))
+            await writer.drain()
+
+            register_offset += 0x200000
+
+        logger.info("[PyTest] HDM Decoder setup complete")
 
     async def test_mmio(
         target_ld_id: int, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -282,6 +372,7 @@ async def test_multi_logical_device_ld_id():
     async def wait_test_stop():
         await gather(*(device.wait_for_ready() for device in mld._cxl_type3_devices))
         # Test MLD LD-ID handling
+        await setup_hdm_decoder(num_ld, mld_pseudo_server_reader, mld_pseudo_server_writer)
         await configure_bar(target_ld_id, mld_pseudo_server_reader, mld_pseudo_server_writer)
         await test_mmio(target_ld_id, mld_pseudo_server_reader, mld_pseudo_server_writer)
         await send_packets(target_ld_id, mld_pseudo_server_reader, mld_pseudo_server_writer)
