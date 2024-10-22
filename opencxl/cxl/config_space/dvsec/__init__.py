@@ -24,6 +24,10 @@ from .cxl_devices import (
     DvsecCxlDevices,
     DvsecCxlDevicesOptions,
 )
+from opencxl.cxl.config_space.dvsec.mld_dvsec import (
+    MldDvsec,
+    MldDvsecOptions,
+)
 from .flex_bus_port import DvsecFlexBusPortCapability, DvsecFlexBusPortCapabilityOptions
 from .register_locator import DvsecRegisterLocator, DvsecRegisterLocatorOptions
 
@@ -34,6 +38,7 @@ class CXL_DEVICE_TYPE(Enum):
     LD = auto()
     ACCEL_T1 = auto()
     ACCEL_T2 = auto()
+    FMLD = auto()
 
 
 class DvsecConfigSpaceOptions(TypedDict):
@@ -187,7 +192,7 @@ class DvsecConfigSpace(BitMaskedBitStructure):
 
     
     def _add_mld_dvsec(self, start: int) -> int:
-        is_fmld = self._device_type in (CXL_DEVICE_TYPE.USP, CXL_DEVICE_TYPE.DSP)
+        is_fmld = self._device_type in (CXL_DEVICE_TYPE.FMLD)
         if not is_fmld:
             return start
 
