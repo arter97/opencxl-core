@@ -74,6 +74,7 @@ class DvsecConfigSpace(BitMaskedBitStructure):
         start = self._add_cxl_extension_dvsec_for_ports(start)
         start = self._add_pcie_dvsec_for_flex_bus_ports(start)
         start = self._add_register_locator_dvsec(start)
+        start = self._add_mld_dvsec(start)
         if self._last_offset_header:
             self._last_offset_header["next_capability_offset"] = next_offset
 
@@ -183,6 +184,31 @@ class DvsecConfigSpace(BitMaskedBitStructure):
             )
         )
         return end + 1
+
+    
+    def _add_mld_dvsec(self, start: int) -> int:
+        is_fmld = self._device_type in (CXL_DEVICE_TYPE.USP, CXL_DEVICE_TYPE.DSP)
+        if not is_fmld:
+            return start
+
+        dvsec_size = MldDvsec.get_size()
+        end = start + dvsec_size - 1
+        next = end + 1 + self._capability_offset
+        dvsec_options: MldDvsecOptions = {
+            "header": {"next_capability_offset": next}
+        }
+        self._last_offset_header = dvsec_options["header"]
+        self._fields.append(
+            StructureField(
+                "mld_dvsec",
+                start,
+                end,
+                MldDvsec,
+                options=dvsec_options,
+            )
+        )
+        return end + 1
+
 
     @staticmethod
     def get_size_from_options(options: DvsecConfigSpaceOptions) -> int:
